@@ -1,0 +1,53 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  subscription: 'f669e3e1-7c82-46d4-ac02-1374e4765275'
+  resourceGroup: 'ra-egg-dev'
+  dataFactory: 'egg-adf-dev'
+
+steps:
+
+# Installs Node and the npm packages saved in your package.json file in the build
+
+- task: NodeTool@0
+  inputs:
+    versionSpec: '10.x'
+  displayName: 'Install Node.js'
+
+- task: Npm@1
+  inputs:
+    command: 'install'
+    verbose: true
+  displayName: 'Install npm package'
+
+# Validates all of the Data Factory resources in the repository. You'll get the same validation errors as when "Validate All" is selected.
+# Enter the appropriate subscription and name for the source factory.
+- task: Npm@1
+  inputs:
+    command: 'custom'
+    customCommand: 'run build validate $(System.DefaultWorkingDirectory)/DataFactory /subscriptions/$(subscription)/resourceGroups/$(resourceGroup)/providers/Microsoft.DataFactory/factories/$(dataFactory)'
+  displayName: 'Validate'
+
+# Data Factory task to validate and then generate the ARM template into the destination folder, which is the same as selecting "Publish" from the UX
+- task: Npm@1
+  inputs:
+    command: 'custom'
+    customCommand: 'run build export $(System.DefaultWorkingDirectory)/DataFactory /subscriptions/$(subscription)/resourceGroups/$(resourceGroup)/providers/Microsoft.DataFactory/factories/$(dataFactory) "ArmTemplates"'
+  displayName: 'Generate ARM template'
+
+# Publish the artifact to be used as a source for a release pipeline.
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifacts to drop'
+  inputs:
+    ArtifactName: 'drop'
+    PathtoPublish: '$(System.DefaultWorkingDirectory)/ArmTemplates'
+  condition: succeededOrFailed()
