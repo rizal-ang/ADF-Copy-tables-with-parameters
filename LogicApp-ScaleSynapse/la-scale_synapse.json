@@ -1,0 +1,172 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Delay": {
+                "inputs": {
+                    "interval": {
+                        "count": 30,
+                        "unit": "Second"
+                    }
+                },
+                "runAfter": {
+                    "HTTP": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Wait"
+            },
+            "HTTP": {
+                "inputs": {
+                    "authentication": {
+                        "type": "ManagedServiceIdentity"
+                    },
+                    "body": {
+                        "properties": {
+                            "requestedServiceObjectiveName": "@{triggerBody()?['ServiceLevel']}"
+                        }
+                    },
+                    "method": "PATCH",
+                    "uri": "https://management.azure.com/subscriptions/@{parameters('SubscriptionId')}/resourceGroups/@{parameters('ResourceGroup')}/providers/Microsoft.Sql/servers/@{parameters('SQLServer')}/databases/@{parameters('SynapseSQL')}?api-version=2014-04-01-preview"
+                },
+                "runAfter": {},
+                "type": "Http"
+            },
+            "HTTP_-_Return_Response": {
+                "inputs": {
+                    "method": "POST",
+                    "uri": "@{triggerBody().callBackUri}"
+                },
+                "runAfter": {
+                    "Until": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Http"
+            },
+            "Initialize_variable": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "FinishLoop",
+                            "type": "boolean",
+                            "value": false
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Delay": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Until": {
+                "actions": {
+                    "Condition": {
+                        "actions": {
+                            "Set_variable": {
+                                "inputs": {
+                                    "name": "FinishLoop",
+                                    "value": true
+                                },
+                                "runAfter": {},
+                                "type": "SetVariable"
+                            }
+                        },
+                        "else": {
+                            "actions": {
+                                "Delay_2": {
+                                    "inputs": {
+                                        "interval": {
+                                            "count": 30,
+                                            "unit": "Second"
+                                        }
+                                    },
+                                    "runAfter": {},
+                                    "type": "Wait"
+                                }
+                            }
+                        },
+                        "expression": {
+                            "or": [
+                                {
+                                    "equals": [
+                                        "@body('Get_DW_State').properties.status",
+                                        "Online"
+                                    ]
+                                }
+                            ]
+                        },
+                        "runAfter": {
+                            "Get_DW_State": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "If"
+                    },
+                    "Get_DW_State": {
+                        "inputs": {
+                            "authentication": {
+                                "type": "ManagedServiceIdentity"
+                            },
+                            "method": "GET",
+                            "uri": "https://management.azure.com/subscriptions/@{parameters('SubscriptionId')}/resourceGroups/@{parameters('ResourceGroup')}/providers/Microsoft.Sql/servers/@{parameters('SQLServer')}/databases/@{parameters('SynapseSQL')}?api-version=2014-04-01"
+                        },
+                        "runAfter": {},
+                        "type": "Http"
+                    }
+                },
+                "expression": "@equals(variables('FinishLoop'), true)",
+                "limit": {
+                    "count": 60,
+                    "timeout": "PT1H"
+                },
+                "runAfter": {
+                    "Initialize_variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Until"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "parameters": {
+            "ResourceGroup": {
+                "defaultValue": "",
+                "type": "String"
+            },
+            "SQLServer": {
+                "defaultValue": "",
+                "type": "String"
+            },
+            "SubscriptionId": {
+                "defaultValue": "",
+                "type": "String"
+            },
+            "SynapseSQL": {
+                "defaultValue": "",
+                "type": "String"
+            }
+        },
+        "triggers": {
+            "manual": {
+                "inputs": {
+                    "method": "POST",
+                    "schema": {
+                        "properties": {
+                            "ServiceLevel": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "kind": "Http",
+                "type": "Request"
+            }
+        }
+    },
+    "parameters": {}
+}
